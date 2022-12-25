@@ -1,0 +1,1 @@
+odin run src -out:bin/new-life -debug -strict-style -vet -collection:lib=./lib
