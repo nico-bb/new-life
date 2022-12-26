@@ -43,11 +43,18 @@ layout (std140, binding = 1) uniform LightingContext {
     uint shadowCasterCount;
 };
 
+struct Material {
+    vec4 color;
+    float roughness;
+    float metallicness;
+};
+
 uniform sampler2D bufferedPosition;
 uniform sampler2D bufferedNormal;
 uniform sampler2D bufferedAlbedo;
 uniform sampler2D bufferedDepth;
 uniform sampler2D shadowMaps[MAX_SHADOW_MAPS * MAXS_SHADOW_CASCADE];
+uniform Material material;
 
 vec3 computeDirectionalLighting( Light light, vec3 p, vec3 n );
 vec3 computePointLighting( Light light, vec3 p, vec3 n );
