@@ -3,11 +3,13 @@ package world
 import "lib:iris"
 import "lib:iris/gltf"
 
-WORLD_WIDTH :: 10
-WORLD_HEIGHT :: 10
+WORLD_WIDTH :: 5
+WORLD_HEIGHT :: 5
 
 World :: struct {
-	tiles: [WORLD_WIDTH * WORLD_HEIGHT]World_Tile,
+	width:  int,
+	height: int,
+	tiles:  []World_Tile,
 }
 
 World_Tile :: struct {
@@ -16,7 +18,12 @@ World_Tile :: struct {
 }
 
 create_world :: proc(scene: ^iris.Scene) -> World {
-	world := World{}
+	world := World {
+		width  = WORLD_WIDTH,
+		height = WORLD_HEIGHT,
+		tiles  = make([]World_Tile, WORLD_WIDTH * WORLD_HEIGHT),
+	}
+
 	tile_doc, err := gltf.parse_from_file(
 		"models/grass_floor.gltf",
 		.Gltf_External,
@@ -30,20 +37,25 @@ create_world :: proc(scene: ^iris.Scene) -> World {
 
 	tiles_holder := iris.new_node(scene, iris.Empty_Node)
 	iris.insert_node(scene, tiles_holder)
+
+	shader, shader_exist := iris.shader_from_name("deferred_geometry")
+	shader_spec, spec_exist := iris.shader_specialization_from_name("deferred_default")
+	assert(shader_exist && spec_exist)
+
 	for tile, i in &world.tiles {
 		tile.index = i
 		tile.node = iris.new_node(scene, iris.Model_Node)
 
 		loader := iris.Model_Loader {
 			flags = {.Load_Position, .Load_Normal, .Load_TexCoord0},
+			shader_ref = shader,
+			shader_spec = shader_spec,
 			rigged = false,
 		}
-		shader_exist, spec_exist: bool
-		loader.shader_ref, shader_exist = iris.shader_from_name("deferred_geometry")
-		loader.shader_spec, shader_exist = iris.shader_specialization_from_name("deferred_default")
-		assert(shader_exist && spec_exist)
 
 		iris.model_node_from_gltf(tile.node, loader, gltf_tile_node)
+		iris.node_local_transform(tile.node, iris.transform(t = {0, 0, 0}))
+		iris.insert_node(scene, tile.node, tiles_holder)
 	}
 
 	return world
