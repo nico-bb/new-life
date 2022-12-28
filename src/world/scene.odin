@@ -6,6 +6,7 @@ import "../interface"
 World_State :: struct {
 	scene: ^iris.Scene,
 	world: World_Grid,
+	pawns: [1]Pawn,
 }
 
 world_state :: proc() -> interface.Game_Interface {
@@ -45,7 +46,7 @@ world_state :: proc() -> interface.Game_Interface {
 	}
 
 	world.world = create_world(world.scene)
-	create_pawn(world.scene)
+	world.pawns[0] = create_pawn(world.scene)
 
 	it := interface.Game_Interface {
 		data   = world,
@@ -58,6 +59,9 @@ world_state :: proc() -> interface.Game_Interface {
 update_world_state :: proc(data: rawptr, dt: f32) {
 	world := cast(^World_State)data
 
+	for i in 0 ..< len(world.pawns) {
+		update_pawn(&world.pawns[i])
+	}
 	iris.update_scene(world.scene, dt)
 }
 

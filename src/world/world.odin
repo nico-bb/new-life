@@ -54,7 +54,10 @@ create_world :: proc(scene: ^iris.Scene) -> World_Grid {
 		}
 
 		iris.model_node_from_gltf(tile.node, loader, gltf_tile_node)
-		iris.node_local_transform(tile.node, iris.transform(t = {0, 0, 0}))
+
+		x := f32(i % WORLD_WIDTH)
+		z := f32(i / WORLD_WIDTH)
+		iris.node_local_transform(tile.node, iris.transform(t = {x, 0, z}))
 		iris.insert_node(scene, tile.node, tiles_holder)
 	}
 

@@ -6,7 +6,7 @@
         },
         {
             "name": "lib",
-            "path": ".\\lib"
+            "path": "./lib"
         }
     ],
     "enable_document_symbols": true,

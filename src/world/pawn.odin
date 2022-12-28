@@ -1,10 +1,13 @@
 package world
 
+import "core:fmt"
+import "lib:smart"
 import "lib:iris"
 import "lib:iris/gltf"
 
 Pawn :: struct {
-	node: ^iris.Model_Node,
+	node:  ^iris.Model_Node,
+	brain: ^smart.Behavior_Tree,
 }
 
 create_pawn :: proc(scene: ^iris.Scene) -> Pawn {
@@ -41,5 +44,24 @@ create_pawn :: proc(scene: ^iris.Scene) -> Pawn {
 	pawn.node.options += {.Cast_Shadows}
 
 	iris.insert_node(scene, pawn.node)
+
+	init_pawn_behaviors(&pawn)
 	return pawn
+}
+
+init_pawn_behaviors :: proc(pawn: ^Pawn) {
+	pawn.brain = smart.new_tree()
+
+	test_behavior := smart.new_node_from(pawn.brain, smart.Behavior_Action {
+		action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
+			fmt.println("Brainz!")
+			return .Done
+		},
+	})
+
+	smart.set_tree_root(pawn.brain, test_behavior)
+}
+
+update_pawn :: proc(pawn: ^Pawn) {
+	smart.run(pawn.brain)
 }
