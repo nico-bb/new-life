@@ -6,7 +6,7 @@ import "lib:iris/gltf"
 WORLD_WIDTH :: 5
 WORLD_HEIGHT :: 5
 
-World :: struct {
+World_Grid :: struct {
 	width:  int,
 	height: int,
 	tiles:  []World_Tile,
@@ -17,8 +17,8 @@ World_Tile :: struct {
 	node:  ^iris.Model_Node,
 }
 
-create_world :: proc(scene: ^iris.Scene) -> World {
-	world := World {
+create_world :: proc(scene: ^iris.Scene) -> World_Grid {
+	world := World_Grid {
 		width  = WORLD_WIDTH,
 		height = WORLD_HEIGHT,
 		tiles  = make([]World_Tile, WORLD_WIDTH * WORLD_HEIGHT),
