@@ -46,7 +46,7 @@ world_state :: proc() -> interface.Game_Interface {
 	}
 
 	world.world = create_world(world.scene)
-	world.pawns[0] = create_pawn(world.scene)
+	init_pawn(world.scene, &world.pawns[0])
 
 	it := interface.Game_Interface {
 		data   = world,
@@ -60,7 +60,7 @@ update_world_state :: proc(data: rawptr, dt: f32) {
 	world := cast(^World_State)data
 
 	for i in 0 ..< len(world.pawns) {
-		update_pawn(&world.pawns[i])
+		update_pawn(&world.pawns[i], dt)
 	}
 	iris.update_scene(world.scene, dt)
 }

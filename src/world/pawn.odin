@@ -6,13 +6,14 @@ import "lib:iris"
 import "lib:iris/gltf"
 
 Pawn :: struct {
-	node:  ^iris.Model_Node,
-	brain: ^smart.Behavior_Tree,
+	node:       ^iris.Model_Node,
+	brain:      ^smart.Behavior_Tree,
+
+	// Timers
+	idle_timer: iris.Timer,
 }
 
-create_pawn :: proc(scene: ^iris.Scene) -> Pawn {
-	pawn := Pawn{}
-
+init_pawn :: proc(scene: ^iris.Scene, pawn: ^Pawn) {
 	pawn_doc, err := gltf.parse_from_file(
 		"models/cow.gltf",
 		.Gltf_External,
@@ -45,23 +46,50 @@ create_pawn :: proc(scene: ^iris.Scene) -> Pawn {
 
 	iris.insert_node(scene, pawn.node)
 
-	init_pawn_behaviors(&pawn)
-	return pawn
+	init_pawn_data(pawn)
+	init_pawn_behaviors(pawn)
+}
+
+init_pawn_data :: proc(pawn: ^Pawn) {
+	pawn.idle_timer = iris.Timer {
+		duration = 5,
+		reset    = true,
+	}
 }
 
 init_pawn_behaviors :: proc(pawn: ^Pawn) {
 	pawn.brain = smart.new_tree()
+	pawn.brain.blackboard["idle.timer"] = rawptr(&pawn.idle_timer)
+	pawn.brain.blackboard["dt"] = 0
 
-	test_behavior := smart.new_node_from(pawn.brain, smart.Behavior_Action {
-		action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
-			fmt.println("Brainz!")
-			return .Done
+	// ??
+
+
+	
+	//odinfmt: disable
+
+	test_behavior := smart.new_node_from(
+		pawn.brain, 
+		smart.Behavior_Action {
+			action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
+				fmt.println("Brainz!")
+				return .Done
+			},
+		}, 
+		[]smart.Begin_Decorator{
+			proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
+			data := node.blackboard["idle.timer"].(rawptr)
+			timer := cast(^iris.Timer)data
+			return iris.advance_timer(timer, node.blackboard["dt"].(f32))
+			},
 		},
-	})
-
+	)
 	smart.set_tree_root(pawn.brain, test_behavior)
+	
+	//odinfmt: enable
 }
 
-update_pawn :: proc(pawn: ^Pawn) {
+update_pawn :: proc(pawn: ^Pawn, dt: f32) {
+	pawn.brain.blackboard["dt"] = dt
 	smart.run(pawn.brain)
 }
