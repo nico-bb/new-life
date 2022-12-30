@@ -47,18 +47,38 @@ struct Material {
     vec4 color;
     float roughness;
     float metallicness;
+    vec2 _padding;
 };
 
-uniform sampler2D bufferedPosition;
-uniform sampler2D bufferedNormal;
-uniform sampler2D bufferedAlbedo;
-uniform sampler2D bufferedDepth;
-uniform sampler2D shadowMaps[MAX_SHADOW_MAPS * MAXS_SHADOW_CASCADE];
-uniform vec2 shadowOffsets[16];
-uniform Material material;
 
-vec3 computeDirectionalLighting( Light light, vec3 p, vec3 n );
-vec3 computePointLighting( Light light, vec3 p, vec3 n );
+#define MATERIAL_CACHE_CAP 124
+layout (std140, binding = 2) uniform MaterialCache {
+    Material materials[MATERIAL_CACHE_CAP];
+    uint count;
+};
+
+struct LightDesc {
+    Light light;
+    vec3 normal;
+    vec3 lightDir;
+    vec3 viewDir;
+    vec3 halfwayDir;
+    vec3 nViewPosition;
+};
+
+#define LOC_6 (6 + MAX_SHADOW_MAPS * MAXS_SHADOW_CASCADE)
+
+layout (location = 0)     uniform sampler2D bufferedPosition;
+layout (location = 1)     uniform sampler2D bufferedNormal;
+layout (location = 2)     uniform sampler2D bufferedAlbedo;
+layout (location = 3)     uniform sampler2D bufferedMaterial;
+layout (location = 4)     uniform sampler2D bufferedDepth;
+layout (location = 5)     uniform sampler2D shadowMaps[MAX_SHADOW_MAPS * MAXS_SHADOW_CASCADE];
+layout (location = LOC_6) uniform vec2 shadowOffsets[16];
+
+vec3 diffuseDirectional( LightDesc desc);
+vec3 specularDirectional( LightDesc desc );
+vec3 fresnelApproximation( LightDesc desc, vec3 specularClr );
 float computeShadowValue(int casterIndex, vec3 position, vec3 normal);
 float filterShadowMap(uint shadowMapIndex, vec3 shadowCoord, float bias);
 vec3 applyAtmosphericFog(in vec3 texelClr, float dist, vec3 viewDir, vec3 lightDir);
@@ -74,56 +94,63 @@ void main() {
         discard;
     }
 
+    uint materialId = uint(
+        texture(bufferedMaterial, frag.texCoord).r * MATERIAL_CACHE_CAP + 0.5);
+    Material material = materials[materialId];
+    if (materialId == 0) {
+        finalColor = vec4(1.0, 1.0, 0.0, 0.0);
+        return;
+    }
+
     vec3 ambient = ambient.xyz * ambient.a;
 
     float shadowValue = 0.0;
     for (int i = 0; i < shadowCasterCount; i += 1) {
         shadowValue += computeShadowValue(i, position, normal);
     }
-
-    vec3 lightValue = vec3(0);
+    
+    vec3 F0 = mix(vec3(0.04), albedo, material.metallicness);
+    vec3 diffuse = vec3(0);
+    vec3 specular = vec3(0);
+    LightDesc desc;
+    desc.viewDir = normalize(viewPosition - position);
+    desc.nViewPosition = normalize(viewPosition);
+    desc.normal = normal;
     for (int i = 0; i < lightCount; i += 1) {
         Light light = lights[i];
+        desc.light = light;
+        desc.lightDir = normalize(desc.light.position.xyz);
+        desc.halfwayDir = normalize(desc.lightDir + desc.viewDir);
 
-        if (light.mode == DIRECTIONAL_LIGHT) {
-            lightValue += computeDirectionalLighting(light, position, normal);
-        } else if (light.mode == POINT_LIGHT) {
-            lightValue += computePointLighting(light, position, normal);
-        }
+        diffuse += diffuseDirectional(desc);
+        vec3 lSpec = specularDirectional(desc);
+        vec3 fSpec = fresnelApproximation(desc, F0);
+        specular += fSpec * lSpec;
     }
 
-    vec3 result = (ambient + ((1.0 - shadowValue) * lightValue)) * albedo; 
+    vec3 result = (ambient + ((1.0 - shadowValue) * (diffuse + specular))) * albedo; 
     result = applyAtmosphericFog(result, distance, vec3(0), vec3(0));
     finalColor = vec4(result, 1.0);
 }
 
-vec3 computeDirectionalLighting( Light light, vec3 p, vec3 n ) {
-    vec3 lightDir = normalize(light.position.xyz);
-    float diffuseContribution = max(dot(lightDir, n), 0.0);
-    vec3 diffuse = diffuseContribution * light.color.rgb;
-
-    vec3 viewDir = normalize(viewPosition - p);
-    vec3 reflectDir = reflect(-lightDir, n);
-    float specContribution = max(dot(viewDir, reflectDir), 0.0);
-    specContribution = pow(specContribution, 32.0);
-    vec3 specular =  (specContribution * light.color.rgb);
-
-    return (diffuse + specular);
+vec3 diffuseDirectional( LightDesc desc ) {
+    float diffuse = max(dot(desc.lightDir, desc.normal), 0.0);
+    return diffuse * desc.light.color.rgb;
 }
 
-vec3 computePointLighting( Light light, vec3 p, vec3 n ) {
-    vec3 lightDir = normalize(light.position.xyz - p);
-    float diffuseContribution = max(dot(lightDir, n), 0.0);
-    vec3 diffuse = diffuseContribution * light.color.rgb;
+vec3 specularDirectional( LightDesc desc ) {
+    float specular = max(dot(desc.normal, desc.halfwayDir), 0.0);
+    specular = pow(specular, 32.0);
+    return specular * desc.light.color.rgb;
+}
 
-    vec3 viewDir = normalize(viewPosition - p);
-    vec3 reflectDir = reflect(-lightDir, n);
-    float specContribution = max(dot(viewDir, reflectDir), 0.0);
-    vec3 specular = 0.5 * (specContribution * light.color.rgb);
+vec3 fresnelApproximation( LightDesc desc, vec3 F0 ) {
+    const float fPower = 5.0;
 
-    float distance = length(light.position.xyz - p);
-    float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (pow(distance, 2)));
-    return (diffuse * attenuation) + (specular * attenuation);
+    const float cosTheta = clamp(dot(desc.halfwayDir, desc.nViewPosition), 0.0, 1.0);
+    float fresnelFactor = pow(1.0 - cosTheta, fPower);
+
+    return F0 + (1.0 - F0) * fresnelFactor;
 }
 
 float computeShadowValue(int casterIndex, vec3 position, vec3 normal) {
@@ -192,10 +219,3 @@ vec3 applyAtmosphericFog(in vec3 texelClr, float dist, vec3 viewDir, vec3 lightD
     vec3 result = mix(texelClr, fogClr, fogContribution);
     return result;
 }
-
-////////////////
-/*
-    PBR SANDBOX
-*/
-
-

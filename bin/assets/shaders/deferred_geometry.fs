@@ -2,6 +2,7 @@
 layout (location = 0) out vec4 bufferedPosition;
 layout (location = 1) out vec4 bufferedNormal;
 layout (location = 2) out vec4 bufferedAlbedo;
+layout (location = 3) out vec4 bufferedMaterial;
 
 in VS_OUT {
 	vec3 position;
@@ -16,10 +17,13 @@ subroutine vec3 subSampleAlbedo();
 layout (location = 0) uniform sampler2D mapDiffuse0;
 layout (location = 1) uniform sampler2D mapNormal0;
 layout (location = 2) uniform bool useTangentSpace;
+layout (location = 4) uniform uint materialId;
 
 layout (location = 0) subroutine uniform subSampleAlbedo sampleAlbedo;
 
+#define MAX_MATERIAL 124.0
 void main() {
+
 	if (useTangentSpace) {
 		vec3 sampledNormal = texture(mapNormal0, frag.texCoord).rgb;
 		sampledNormal = sampledNormal * 2.0 - 1.0;
@@ -33,6 +37,7 @@ void main() {
 	bufferedPosition = vec4(frag.position, 1.0);
 	bufferedAlbedo.rgb = sampleAlbedo();
 	bufferedAlbedo.a = 1.0;
+    bufferedMaterial = vec4(float(materialId) / MAX_MATERIAL, 0.0, 0.0, 1.0);
 }
 
 ////////////////////////////////////
