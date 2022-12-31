@@ -14,6 +14,20 @@ in VS_OUT {
 
 subroutine vec3 subSampleAlbedo();
 
+struct Material {
+    vec4 color;
+    float roughness;
+    float metallicness;
+    vec2 _padding;
+};
+
+
+#define MATERIAL_CACHE_CAP 124
+layout (std140, binding = 2) uniform MaterialCache {
+    Material materials[MATERIAL_CACHE_CAP];
+    uint count;
+};
+
 layout (location = 0) uniform sampler2D mapDiffuse0;
 layout (location = 1) uniform sampler2D mapNormal0;
 layout (location = 2) uniform bool useTangentSpace;
@@ -46,6 +60,10 @@ void main() {
 layout (index = 0) subroutine(subSampleAlbedo)
 vec3 sampleDefaultAlbedo() {
     vec3 result = texture(mapDiffuse0, frag.texCoord).rgb;
+    const bvec3 isZero = equal(result, vec3(0.0));
+    if (all(isZero)) {
+        result = materials[materialId].color.rgb;
+    }
     return result;
 }
 
@@ -85,14 +103,6 @@ vec3 sampleTerrainAlbedo() {
 
     // float r = clamp(frag.color.g, 0.0,)
     // return vec3(frag.color.g, 0.0, 0.0);
-}
-
-layout (index = 2) subroutine(subSampleAlbedo)
-vec3 sampleHighlightTileAlbedo() {
-    const vec2 center = vec2(0.5, 0.5);
-    const vec2 toCenter = center - frag.texCoord;
-    const float highlightValue = smoothstep(0.45, 0.6, length(toCenter));
-    return vec3(highlightValue, highlightValue, highlightValue);
 }
 
 ////////////////////////////////////

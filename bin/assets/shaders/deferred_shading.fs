@@ -170,7 +170,7 @@ float computeShadowValue(int casterIndex, vec3 position, vec3 normal) {
         vec3 nShadowCoord = shadowCoord.xyz / shadowCoord.w;
         nShadowCoord = nShadowCoord * 0.5 + 0.5;
         if (i == cascadeCount - 1 || abs(viewCoord.z) < cascadesDistances[casterIndex][i]) {
-            return filterShadowMap(shadowMapIndex, nShadowCoord, bias);
+            return filterShadowMap(shadowMapIndex, nShadowCoord, 0.0);
         }
     }
 

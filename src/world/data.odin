@@ -1,16 +1,43 @@
 package world
 
+import "core:mem"
 import "lib:iris"
+import "lib:iris/allocators"
 import "../interface"
 
 World_State :: struct {
-	scene: ^iris.Scene,
-	world: World_Grid,
-	pawns: [1]Pawn,
+	free_list: allocators.Free_List_Allocator,
+	allocator: mem.Allocator,
+	plugin:    iris.Plugin,
+	scene:     ^iris.Scene,
+	grid:      World_Grid,
+	pawns:     [1]Pawn,
 }
 
 world_state :: proc() -> interface.Game_Interface {
 	world := new(World_State)
+
+	allocators.init_free_list_allocator(
+		&world.free_list,
+		make([]byte, mem.Megabyte * 10),
+		.Find_Best,
+		4,
+	)
+	world.allocator = allocators.free_list_allocator(&world.free_list)
+
+	world.plugin = iris.Plugin {
+		desc = iris.Plugin_Desc{
+			source_dir = "../../src/world/logic",
+			dll_path = "../game.dll",
+			load_symbol = "load",
+			reload_symbol = "reload",
+			unload_symbol = "unload",
+			update_symbol = "update",
+		},
+		refresh_rate = 5,
+		flags = {.Build_On_Load},
+		user_ptr = world,
+	}
 
 	shader, _ := iris.shader_from_name("deferred_geometry")
 	shader_spec := iris.shader_specialization_resource(
@@ -45,11 +72,12 @@ world_state :: proc() -> interface.Game_Interface {
 		iris.insert_node(world.scene, sun_node)
 	}
 
-	world.world = create_world(world.scene)
-	init_pawn(world.scene, &world.pawns[0])
+	world.grid = create_world(world.scene)
+	init_pawn(world.scene, &world.pawns[0], &world.grid)
 
 	it := interface.Game_Interface {
 		data   = world,
+		plugin = &world.plugin,
 		update = update_world_state,
 		draw   = draw_world_state,
 	}
@@ -59,9 +87,6 @@ world_state :: proc() -> interface.Game_Interface {
 update_world_state :: proc(data: rawptr, dt: f32) {
 	world := cast(^World_State)data
 
-	for i in 0 ..< len(world.pawns) {
-		update_pawn(&world.pawns[i], dt)
-	}
 	iris.update_scene(world.scene, dt)
 }
 

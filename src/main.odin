@@ -41,7 +41,10 @@ init :: proc(data: iris.App_Data) {
 	g := cast(^Game)data
 
 	g.states[.World] = world.world_state()
+	plugin_ok := iris.load_plugin(g.states[.World].plugin)
+	assert(plugin_ok)
 	g.current = .World
+
 	// g.scene = iris.scene_resource("menu", {}).data.(^iris.Scene)
 	// g.ui_theme = iris.User_Interface_Theme {
 	// 	borders = false,
@@ -87,6 +90,8 @@ update :: proc(data: iris.App_Data) {
 	dt := f32(iris.elapsed_time())
 
 	current_state := g.states[g.current]
+
+	iris.update_plugin(current_state.plugin)
 	current_state.update(current_state.data, dt)
 }
 
@@ -101,5 +106,8 @@ draw :: proc(data: iris.App_Data) {
 }
 
 close :: proc(data: iris.App_Data) {
+	g := cast(^Game)data
 
+	current_state := g.states[g.current]
+	iris.unload_plugin(current_state.plugin)
 }

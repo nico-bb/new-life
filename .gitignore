@@ -1,3 +1,9 @@
 bin/new-life.exe
 bin/new-life.pdb
+bin/new-life.lib
+bin/new-life.exp
+bin/game.dll
+bin/game.pdb
+bin/game.lib
+bin/game.exp
 bin/new-life
