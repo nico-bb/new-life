@@ -1,6 +1,6 @@
 package logic
 
-import "core:fmt"
+// import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "lib:iris"
@@ -15,9 +15,9 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
 	pawn.brain.blackboard["pawn"] = rawptr(pawn)
 	pawn.brain.blackboard["dt"] = 0
 
-// ??
+	// ??
 
-
+	
 	//odinfmt: disable
   idle_sequence := smart.new_node(pawn.brain, smart.Behavior_Sequence)
   idle_sequence.halt_signal = .Failure
@@ -46,8 +46,9 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
             }
 
             if valid_tile {
-              pawn.next_coord = tile_coord
+              start_pawn_move(pawn, tile_coord)
               node.blackboard["path.found"] = true
+              node.blackboard["path.arrived"] = false
               break
             }
           }
@@ -55,28 +56,71 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
         },
       }, 
       []smart.Begin_Decorator{
-        proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
-          pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
-          return iris.advance_timer(&pawn.idle_timer, node.blackboard["dt"].(f32))
+        smart.Ignore_Decorator {
+          ignore_proc = proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
+            if found, ok := node.blackboard["path.found"].(bool); ok {
+              return found
+            }
+            return false
+          },
+        },
+        smart.Condition_Decorator {
+          condition_proc = proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
+            pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
+            return iris.advance_timer(&pawn.idle_timer, node.blackboard["dt"].(f32))
+          },
         },
       },
 	  ),
 
-    // Single tile movement
     smart.new_node_from(
-      pawn.brain, 
-      smart.Behavior_Action {
+      tree = pawn.brain,
+      from = smart.Behavior_Action {
         action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
-          // world := cast(^World_Grid)node.blackboard["world"].(rawptr)
           pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
-          fmt.println("Moving pawn")
-          move_pawn_to_next_coord(pawn)
+          dt := node.blackboard["dt"].(f32)
+
+          t, done := iris.advance_tween(&pawn.move_tween, dt)
+
+          if done {
+            iris.reset_tween(&pawn.move_tween)
+            node.blackboard["path.arrived"] = true
+            return .Done
+          }
+          
+          move_pawn(pawn, t.(f32))
+          return .Not_Done
+        },
+      },
+      begins = []smart.Begin_Decorator{
+        smart.Ignore_Decorator {
+          ignore_proc = proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
+            return node.blackboard["path.arrived"].(bool)
+          },
+        },
+        smart.Condition_Decorator {
+          condition_proc = proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
+            return node.blackboard["path.found"].(bool)
+          },
+        },
+      },
+    ),
+
+    // Movement commit
+    smart.new_node_from(
+      tree = pawn.brain, 
+      from = smart.Behavior_Action {
+        action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
+          pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
+          commit_pawn_move(pawn)
           return .Done
         },
       }, 
-      []smart.Begin_Decorator{
-        proc(node: ^smart.Behavior_Node) -> smart.Condition_Proc_Result {
-          return node.blackboard["path.found"].(bool)
+      ends = []smart.End_Decorator{
+        smart.Property_Decorator {
+          trigger = .Success,
+          key  = "path.found",
+          value = false,
         },
       },
 	  ),
@@ -86,16 +130,30 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
 	//odinfmt: enable
 }
 
-move_pawn_to_next_coord :: proc(pawn: ^Pawn) {
-	pawn_rotation := move_direction_to_rotation(pawn.next_coord.? - pawn.current_coord)
-	r := linalg.quaternion_angle_axis_f32(math.to_radians(pawn_rotation), iris.VECTOR_UP)
+start_pawn_move :: proc(pawn: ^Pawn, next: iris.Vector3) {
+	pawn.next_coord = next
+	pawn.rotation = linalg.quaternion_angle_axis_f32(
+		math.to_radians(move_direction_to_rotation(pawn.next_coord.? - pawn.current_coord)),
+		iris.VECTOR_UP,
+	)
+}
 
+move_pawn :: proc(pawn: ^Pawn, t: f32) {
+	v := pawn.next_coord.? - pawn.current_coord
+	v *= t
+	iris.node_local_transform(
+		pawn.node,
+		iris.transform(t = pawn.current_coord + v, r = pawn.rotation),
+	)
+}
+
+commit_pawn_move :: proc(pawn: ^Pawn) {
 	pawn.previous_coord = pawn.current_coord
 	pawn.current_coord = pawn.next_coord.?
 	pawn.next_coord = nil
 
 
-	iris.node_local_transform(pawn.node, iris.transform(t = pawn.current_coord, r = r))
+	iris.node_local_transform(pawn.node, iris.transform(t = pawn.current_coord, r = pawn.rotation))
 }
 
 move_direction_to_rotation :: proc(dir: iris.Vector3) -> f32 {

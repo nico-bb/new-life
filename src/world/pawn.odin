@@ -9,12 +9,14 @@ Pawn :: struct {
 	brain:          ^smart.Behavior_Tree,
 
 	// Spatial data
+	rotation:       iris.Quaternion,
 	current_coord:  iris.Vector3,
 	previous_coord: Maybe(iris.Vector3),
 	next_coord:     Maybe(iris.Vector3),
 
 	// Timers
 	idle_timer:     iris.Timer,
+	move_tween:     iris.Tween,
 }
 
 init_pawn :: proc(scene: ^iris.Scene, pawn: ^Pawn, world: ^World_Grid) {
@@ -60,5 +62,11 @@ init_pawn_data :: proc(pawn: ^Pawn) {
 	pawn.idle_timer = iris.Timer {
 		duration = 5,
 		reset    = true,
+	}
+	pawn.move_tween = iris.Tween {
+		timer = iris.Timer{duration = 1, reset = false},
+		interpolation = .In_Out,
+		start = f32(0),
+		end = f32(1),
 	}
 }
