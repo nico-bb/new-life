@@ -1,6 +1,8 @@
 package logic
 
 import "core:fmt"
+import "core:math"
+import "core:math/linalg"
 import "lib:iris"
 import "lib:smart"
 import world ".."
@@ -18,6 +20,7 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
 
 	//odinfmt: disable
   idle_sequence := smart.new_node(pawn.brain, smart.Behavior_Sequence)
+  idle_sequence.halt_signal = .Failure
 	append(
     &idle_sequence.children,
     // Idle pathfinding
@@ -66,6 +69,7 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
         action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
           // world := cast(^World_Grid)node.blackboard["world"].(rawptr)
           pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
+          fmt.println("Moving pawn")
           move_pawn_to_next_coord(pawn)
           return .Done
         },
@@ -83,11 +87,30 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
 }
 
 move_pawn_to_next_coord :: proc(pawn: ^Pawn) {
+	pawn_rotation := move_direction_to_rotation(pawn.next_coord.? - pawn.current_coord)
+	r := linalg.quaternion_angle_axis_f32(math.to_radians(pawn_rotation), iris.VECTOR_UP)
+
 	pawn.previous_coord = pawn.current_coord
 	pawn.current_coord = pawn.next_coord.?
 	pawn.next_coord = nil
 
-	iris.node_local_transform(pawn.node, iris.transform(t = pawn.current_coord))
+
+	iris.node_local_transform(pawn.node, iris.transform(t = pawn.current_coord, r = r))
+}
+
+move_direction_to_rotation :: proc(dir: iris.Vector3) -> f32 {
+	switch {
+	case dir == {0, 0, -1}:
+		return 180
+	case dir == {1, 0, 0}:
+		return 90
+	case dir == {0, 0, 1}:
+		return 0
+	case dir == {-1, 0, 0}:
+		return -90
+	}
+
+	return 0
 }
 
 destroy_pawn_behaviors :: proc(pawn: ^Pawn) {
