@@ -2,6 +2,7 @@ package logic
 
 // import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import "core:math/linalg"
 import "lib:iris"
 import "lib:smart"
@@ -30,19 +31,25 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
         action = proc(node: ^smart.Behavior_Node) -> smart.Action_Proc_Result {
           world := cast(^World_Grid)node.blackboard["world"].(rawptr)
           pawn := cast(^Pawn)node.blackboard["pawn"].(rawptr)
-          adjacents := adjacent_tiles(world, pawn.current_coord)
+          adjacents := adjacent_tiles(world, pawn.current_coord, {})
 
+          count := len(adjacents)
           node.blackboard["path.found"] = false
-          for t in adjacents do if t != nil {
-            tile := t.?
-            tile_coord := index_to_coord(world, tile.index)
+          for count > 0 {
+            index := int(rand.int63_max(i64(count)))
             
+            tile_coord: iris.Vector3
             valid_tile := true
-            if pawn.previous_coord != nil {
-              previous := pawn.previous_coord.?
-              if tile_coord == previous {
-                valid_tile = false
+            if adjacents[index] != nil {
+              tile_coord = index_to_coord(world, adjacents[index].?.index)
+
+              if pawn.previous_coord != nil {
+                if tile_coord == pawn.previous_coord.? {
+                  valid_tile = false
+                }
               }
+            } else {
+              valid_tile = false
             }
 
             if valid_tile {
@@ -50,6 +57,9 @@ init_pawn_behaviors :: proc(pawn: ^Pawn, world: ^World_Grid) {
               node.blackboard["path.found"] = true
               node.blackboard["path.arrived"] = false
               break
+            } else {
+              adjacents[index] = adjacents[count - 1]
+              count -= 1
             }
           }
           return .Done

@@ -63,5 +63,35 @@ create_world :: proc(scene: ^iris.Scene) -> World_Grid {
 		iris.insert_node(scene, tile.node, tiles_holder)
 	}
 
+	tree_doc, glb_err := gltf.parse_from_file(
+		"models/tree.glb",
+		.Glb,
+		context.temp_allocator,
+		context.temp_allocator,
+	)
+	assert(glb_err == nil)
+	iris.load_resources_from_gltf(&tree_doc)
+
+	tree_node, tree_exist := gltf.find_node_with_name(&tree_doc, "tree")
+	assert(tree_exist)
+
+	tree_model := iris.new_node(scene, iris.Model_Node)
+	iris.model_node_from_gltf(
+		tree_model,
+		iris.Model_Loader{
+			flags = {.Load_Position, .Load_Normal, .Load_TexCoord0},
+			shader_ref = shader,
+			shader_spec = shader_spec,
+			rigged = false,
+		},
+		tree_node,
+	)
+
+	iris.insert_node(scene, tree_model)
+
 	return world
+}
+
+init_world_content :: proc(grid: ^World_Grid) {
+
 }
