@@ -8,10 +8,12 @@ World_State :: world.World_State
 @(export)
 load :: proc(app: rawptr, ptr: rawptr) {
 	iris.set_app_ptr(app)
+	iris.load_api(.GL)
 	world := cast(^World_State)ptr
 
 	context.allocator = world.allocator
 
+	init_world_grid(&world.grid, world.scene)
 	for i in 0 ..< len(world.pawns) {
 		init_pawn_behaviors(&world.pawns[i], &world.grid)
 	}
@@ -20,6 +22,7 @@ load :: proc(app: rawptr, ptr: rawptr) {
 @(export)
 reload :: proc(app: rawptr, ptr: rawptr) {
 	iris.set_app_ptr(app)
+	iris.load_api(.GL)
 	world := cast(^World_State)ptr
 
 	context.allocator = world.allocator

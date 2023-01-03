@@ -72,7 +72,6 @@ world_state :: proc() -> interface.Game_Interface {
 		iris.insert_node(world.scene, sun_node)
 	}
 
-	world.grid = create_world(world.scene)
 	init_pawn(world.scene, &world.pawns[0], &world.grid)
 
 	it := interface.Game_Interface {

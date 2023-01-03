@@ -49,13 +49,11 @@ init_pawn :: proc(scene: ^iris.Scene, pawn: ^Pawn, world: ^World_Grid) {
 		pawn_node,
 	)
 	iris.node_local_transform(model_node, iris.transform(s = iris.Vector3{0.5, 0.5, 0.5}))
-	// pawn.node.options += {.Cast_Shadows}
 
 	iris.insert_node(scene, pawn.node)
 	iris.insert_node(scene, model_node, pawn.node)
 
 	init_pawn_data(pawn)
-	// init_pawn_behaviors(pawn, world)
 }
 
 init_pawn_data :: proc(pawn: ^Pawn) {
