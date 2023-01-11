@@ -3,4 +3,4 @@
 	url = git@github.com:nico-bb/iris.git
 [submodule "lib/smart"]
 	path = lib/smart
-	url = https://github.com/nico-bb/smart.git
+	url = git@github.com:nico-bb/smart.git
