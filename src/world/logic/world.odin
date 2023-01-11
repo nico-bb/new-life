@@ -71,15 +71,15 @@ init_world_grid :: proc(grid: ^World_Grid, scene: ^iris.Scene) {
 	}
 
 	tree_doc, glb_err := gltf.parse_from_file(
-		"models/tree.glb",
-		.Glb,
+		"models/tree_low.gltf",
+		.Gltf_External,
 		context.temp_allocator,
 		context.temp_allocator,
 	)
 	assert(glb_err == nil)
 	iris.load_resources_from_gltf(&tree_doc)
 
-	tree_node, tree_exist := gltf.find_node_with_name(&tree_doc, "tree")
+	tree_node, tree_exist := gltf.find_node_with_name(&tree_doc, "Tree.009")
 	assert(tree_exist)
 
 
@@ -87,6 +87,7 @@ init_world_grid :: proc(grid: ^World_Grid, scene: ^iris.Scene) {
 		grid,
 		World_Object{
 			kind = .Tree,
+			scale = {0.5, 0.5, 0.5},
 			flags = {.Blocking},
 			derived = Tree_Object{node = iris.new_node(grid.scene, iris.Model_Node)},
 		},
@@ -105,6 +106,47 @@ init_world_grid :: proc(grid: ^World_Grid, scene: ^iris.Scene) {
 
 	iris.insert_node(grid.scene, tree_object.derived.(Tree_Object).node, grid)
 	set_tile_content(grid, get_tile_at_coord(grid, iris.Vector3{1, 0, 1}), tree_object)
+
+
+	// INSTANCED RENDERING TESTS
+	{
+		bush_doc, bush_err := gltf.parse_from_file(
+			"models/bush_retro.glb",
+			.Glb,
+			context.temp_allocator,
+			context.temp_allocator,
+		)
+		assert(bush_err == nil)
+		iris.load_resources_from_gltf(&bush_doc)
+
+		bush_node, bush_exist := gltf.find_node_with_name(&bush_doc, "deco_bushPlant")
+		assert(bush_exist)
+
+		bushes := iris.new_node_from(scene, iris.Model_Group_Node{count = 9})
+		iris.model_node_from_gltf(
+			bushes,
+			iris.Model_Loader{
+				flags = {.Load_Position, .Load_Normal, .Load_TexCoord0, .Load_As_Instanced},
+				options = {},
+				shader_ref = shader,
+				shader_spec = shader_spec,
+				rigged = false,
+			},
+			bush_node,
+		)
+
+		iris.insert_node(grid.scene, bushes, grid)
+
+		for y in 0 ..< 3 {
+			for x in 0 ..< 3 {
+				iris.group_node_instance_transform(
+					bushes,
+					y * 3 + x,
+					iris.transform(t = {f32(x), 0, f32(y)}, s = {0.5, 0.5, 0.5}),
+				)
+			}
+		}
+	}
 }
 
 index_to_coord :: proc(grid: ^World_Grid, index: int) -> iris.Vector3 {
@@ -176,7 +218,10 @@ set_tile_content :: proc(grid: ^World_Grid, tile: ^World_Tile, object: ^World_Ob
 	object.parent = tile
 	switch d in object.derived {
 	case Tree_Object:
-		iris.node_local_transform(d.node, iris.transform(t = index_to_coord(grid, tile.index)))
+		iris.node_local_transform(
+			d.node,
+			iris.transform(t = index_to_coord(grid, tile.index), s = object.scale),
+		)
 	}
 	if .Blocking in object.flags {
 		tile.walkable = false

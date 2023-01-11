@@ -52,7 +52,7 @@ world_state :: proc() -> interface.Game_Interface {
 		"sampleDefaultAlbedo",
 	)
 
-	world.scene = iris.scene_resource("world", {.Draw_Debug_Collisions}).data.(^iris.Scene)
+	world.scene = iris.scene_resource("world", {}).data.(^iris.Scene)
 
 	// Camera and sunlight settings
 	{

@@ -9,6 +9,7 @@ World_Object_Kind :: enum {
 
 World_Object :: struct {
 	parent:  ^World_Tile,
+	scale:   iris.Vector3,
 	kind:    World_Object_Kind,
 	flags:   World_Object_Flags,
 	derived: Any_World_Object,
